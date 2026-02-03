@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Network Visualization</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #ecf0f1;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100%;
+            height: calc(100vh - 60px);
+            z-index: 1;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            background: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .sidebar {
+            position: absolute;
+            top: 70px;
+            left: 10px;
+            width: 280px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            overflow-y: auto;
+            max-height: calc(100vh - 90px);
+        }
+        
+        .sidebar-panel {
+            padding: 20px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .sidebar-panel h3 {
+            color: #667eea;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #667eea;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+        
+        .stat-value {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .data-panel {
+            position: absolute;
+            top: 70px;
+            right: 10px;
+            width: 320px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 100;
+            max-height: calc(100vh - 90px);
+            overflow-y: auto;
+            display: none;
+        }
+        
+        .data-panel.active {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .data-panel-content {
+            padding: 20px;
+        }
+        
+        .data-panel h3 {
+            color: #667eea;
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #667eea;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .data-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            font-size: 13px;
+        }
+        
+        .info-label {
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+        
+        .info-value {
+            color: #2c3e50;
+            font-weight: 600;
+            text-align: right;
+            flex: 1;
+            margin-left: 10px;
+            word-break: break-word;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-junction {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-endpoint {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .divider {
+            height: 1px;
+            background: #ecf0f1;
+            margin: 15px 0;
+        }
+        
+        .scroll-hint {
+            text-align: center;
+            color: #bdc3c7;
+            font-size: 12px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ecf0f1;
+        }
+
+        /* Added: corner info boxes for API data */
+        .corner-box {
+            position: absolute;
+            z-index: 110;
+            background: rgba(255,255,255,0.95);
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+            padding: 10px 12px;
+            min-width: 170px;
+            font-size: 13px;
+            color: #2c3e50;
+            line-height: 1.2;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            border-left: 4px solid #3498db;
+        }
+        .corner-box .title {
+            font-weight: 700;
+            color: #34495e;
+            font-size: 13px;
+        }
+        .corner-box .value {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .corner-box .muted {
+            color: #7f8c8d;
+            font-weight: 500;
+            font-size: 12px;
+        }
+        .corner-box button.refresh {
+            margin-top: 6px;
+            align-self: flex-end;
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* corner positions (offset from header and map controls) */
+        .corner-box.top-left    { top: 80px; left: 12px; }
+        .corner-box.top-right   { top: 80px; right: 12px; }
+        .corner-box.bottom-left { bottom: 12px; left: 12px; }
+        .corner-box.bottom-right{ bottom: 12px; right: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔴 Pipeline Network Visualization - FRK</h1>
+        <div class="controls">
+            <button id="zoomIn">+ Zoom In</button>
+            <button id="zoomOut">- Zoom Out</button>
+            <button id="fitBounds">↔ Fit Bounds</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Added: four small corner info boxes loaded from API -->
+    <div id="apiBoxTopLeft" class="corner-box top-left" aria-live="polite">
+        <div class="title">API Status</div>
+        <div id="apiStatus" class="value">Loading…</div>
+        <div id="apiStatusMsg" class="muted">Fetching https://api.restful-api.dev/objects</div>
+        <button id="refreshApiBtn1" class="refresh">Refresh</button>
+    </div>
+
+    <div id="apiBoxTopRight" class="corner-box top-right" aria-live="polite">
+        <div class="title">Total Objects</div>
+        <div id="apiTotal" class="value">-</div>
+        <div id="apiTotalMsg" class="muted">Objects from API</div>
+        <button id="refreshApiBtn2" class="refresh">Refresh</button>
+    </div>
+
+    <div id="apiBoxBottomLeft" class="corner-box bottom-left" aria-live="polite">
+        <div class="title">First Object ID</div>
+        <div id="apiFirstId" class="value">-</div>
+        <div id="apiFirstProps" class="muted">Properties preview</div>
+        <button id="refreshApiBtn3" class="refresh">Refresh</button>
+    </div>
+
+    <div id="apiBoxBottomRight" class="corner-box bottom-right" aria-live="polite">
+        <div class="title">Last Object ID</div>
+        <div id="apiLastId" class="value">-</div>
+        <div id="apiLastProps" class="muted">Properties preview</div>
+        <button id="refreshApiBtn4" class="refresh">Refresh</button>
+    </div>
+
+    <!-- Statistics Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-panel">
+            <h3>Network Statistics</h3>
+            <div class="stat-item">
+                <span class="stat-label">Total Features:</span>
+                <span class="stat-value" id="totalFeatures">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Pipeline Nodes:</span>
+                <span class="stat-value" id="nodeCount">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Line Segments:</span>
+                <span class="stat-value" id="lineCount">0</span>
+            </div>
+        </div>
+        
+        <div class="sidebar-panel">
+            <h3>Network Bounds</h3>
+            <div class="stat-item">
+                <span class="stat-label">Center Lat:</span>
+                <span class="stat-value" id="centerLat">0°</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Center Lon:</span>
+                <span class="stat-value" id="centerLon">0°</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Coverage:</span>
+                <span class="stat-value" id="coverage">0°²</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Display Panel -->
+    <div class="data-panel" id="dataPanel">
+        <div class="data-panel-content">
+            <h3>
+                <span>Point Details</span>
+                <button class="close-btn" id="closePanelBtn">✕</button>
+            </h3>
+            
+            <div id="pointTypeInfo"></div>
+            
+            <div class="data-info">
+                <div class="info-item">
+                    <span class="info-label">Latitude:</span>
+                    <span class="info-value" id="pointLat">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Longitude:</span>
+                    <span class="info-value" id="pointLng">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Coordinates:</span>
+                    <span class="info-value" id="pointCoords">-</span>
+                </div>
+            </div>
+
+            <div class="data-info">
+                <div class="info-item">
+                    <span class="info-label">Connection Count:</span>
+                    <span class="info-value" id="connectionCount">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Point Type:</span>
+                    <span class="info-value" id="pointTypeLabel">-</span>
+                </div>
+            </div>
+
+            <div class="data-info">
+                <div class="info-item">
+                    <span class="info-label">Unique ID:</span>
+                    <span class="info-value" id="pointId">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Index:</span>
+                    <span class="info-value" id="pointIndex">-</span>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            
+            <div style="font-size: 12px; color: #7f8c8d; line-height: 1.5;">
+                <strong>Legend:</strong><br>
+                🔴 <strong>Orange</strong> = Junction (2+ connections)<br>
+                🔴 <strong>Red</strong> = Endpoint (1 connection)<br>
+                🔵 <strong>Blue</strong> = Pipeline Line Segment
+            </div>
+            
+            <div class="scroll-hint">Click on any point to view details</div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <!-- Load GeoJSON via fetch and set up map behavior -->
+    <script>
+    // Initialize map
+    const map = L.map('map', { zoomControl: false }).setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Utility to update sidebar stats
+    function updateStats(bounds, features) {
+        document.getElementById('totalFeatures').innerText = features.length || 0;
+
+        let nodeCount = 0, lineCount = 0;
+        (features || []).forEach(f => {
+            const t = f.geometry && f.geometry.type;
+            if (!t) return;
+            if (t === 'Point' || t === 'MultiPoint') nodeCount++;
+            if (t === 'LineString' || t === 'MultiLineString') lineCount++;
+        });
+        document.getElementById('nodeCount').innerText = nodeCount;
+        document.getElementById('lineCount').innerText = lineCount;
+
+        if (bounds && bounds.isValid && bounds.isValid()) {
+            const c = bounds.getCenter();
+            document.getElementById('centerLat').innerText = c.lat.toFixed(6);
+            document.getElementById('centerLon').innerText = c.lng.toFixed(6);
+            document.getElementById('coverage').innerText = 'Bounds applied';
+        } else {
+            document.getElementById('centerLat').innerText = '--';
+            document.getElementById('centerLon').innerText = '--';
+            document.getElementById('coverage').innerText = 'N/A';
+        }
+    }
+
+    // Fetch the GeoJSON and add it to the map
+    (async function loadGeoJSON() {
+        try {
+            const res = await fetch('FRK_for_Webcast_v02_4326.geojson');
+            if (!res.ok) throw new Error('Failed to load GeoJSON');
+            const data = await res.json();
+
+            const layer = L.geoJSON(data, {
+                style: function(feature) {
+                    // style lines
+                    return { color: '#3498db', weight: 3, opacity: 0.9 };
+                },
+                pointToLayer: function(feature, latlng) {
+                    // style points
+                    return L.circleMarker(latlng, {
+                        radius: 5,
+                        fillColor: '#e74c3c',
+                        color: '#ffffff',
+                        weight: 1,
+                        fillOpacity: 0.9
+                    });
+                },
+                onEachFeature: function(feature, layer) {
+                    // simple popup with properties
+                    if (feature.properties) {
+                        let html = '<div style="font-size:13px">';
+                        for (const k in feature.properties) {
+                            html += `<strong>${k}:</strong> ${feature.properties[k]}<br/>`;
+                        }
+                        html += '</div>';
+                        layer.bindPopup(html);
+                    }
+                }
+            }).addTo(map);
+
+            const bounds = layer.getBounds();
+            if (bounds && bounds.isValid && bounds.isValid()) {
+                // Fit map to data bounds with padding and reasonable max zoom
+                map.fitBounds(bounds.pad(0.1), { maxZoom: 17, animate: true });
+            }
+
+            updateStats(bounds, data.features || []);
+        } catch (err) {
+            console.error('Error loading GeoJSON:', err);
+            document.getElementById('coverage').innerText = 'Load error';
+        }
+    })();
+
+    // Controls
+    document.getElementById('zoomIn').addEventListener('click', () => map.zoomIn());
+    document.getElementById('zoomOut').addEventListener('click', () => map.zoomOut());
+    document.getElementById('fitBounds').addEventListener('click', () => {
+        // If a geojson layer exists, fit to its bounds; otherwise reset view
+        let layers = [];
+        map.eachLayer(l => { if (l instanceof L.GeoJSON) layers.push(l); });
+        if (layers.length) {
+            const b = layers[0].getBounds();
+            if (b && b.isValid && b.isValid()) map.fitBounds(b.pad(0.1), { maxZoom: 17 });
+        } else {
+            map.setView([0,0],2);
+        }
+    });
+
+    // Point click event to show data panel
+    let highlightedFeature = null;
+    map.on('click', function(e) {
+        if (e.originalEvent.target.tagName === 'path') {
+            // Clicked on a GeoJSON feature (path)
+            const layer = e.originalEvent.target.closest('.leaflet-interactive');
+            if (layer && layer.feature) {
+                const feature = layer.feature;
+                showDataPanel(feature);
+            }
+        } else {
+            // Clicked on the map background
+            hideDataPanel();
+        }
+    });
+
+    function showDataPanel(feature) {
+        highlightedFeature = feature;
+        document.getElementById('dataPanel').classList.add('active');
+        
+        // Update point type info
+        const pointTypeInfo = document.getElementById('pointTypeInfo');
+        pointTypeInfo.innerHTML = ''; // Clear existing content
+        if (feature.geometry.type === 'Point' || feature.geometry.type === 'MultiPoint') {
+            pointTypeInfo.innerHTML = '<span style="color: #2ecc71; font-weight: 600;">● Point Feature</span>';
+        } else {
+            pointTypeInfo.innerHTML = '<span style="color: #3498db; font-weight: 600;">▼ Line Feature</span>';
+        }
+
+        // Update data fields
+        document.getElementById('pointLat').innerText = feature.geometry.coordinates[1] || '-';
+        document.getElementById('pointLng').innerText = feature.geometry.coordinates[0] || '-';
+        document.getElementById('pointCoords').innerText = feature.geometry.coordinates.join(', ') || '-';
+
+        // Connection count and type
+        const connections = feature.properties && feature.properties.connections;
+        const connectionCount = Array.isArray(connections) ? connections.length : 0;
+        document.getElementById('connectionCount').innerText = connectionCount || '-';
+
+        // Point type label
+        const pointType = feature.properties && feature.properties.pointType;
+        document.getElementById('pointTypeLabel').innerText = pointType || '-';
+
+        // Unique ID and index
+        document.getElementById('pointId').innerText = feature.id || '-';
+        document.getElementById('pointIndex').innerText = feature.properties && feature.properties.index !== undefined ? feature.properties.index : '-';
+    }
+
+    function hideDataPanel() {
+        highlightedFeature = null;
+        document.getElementById('dataPanel').classList.remove('active');
+    }
+
+    // Close button in data panel
+    document.getElementById('closePanelBtn').addEventListener('click', function() {
+        hideDataPanel();
+    });
+    </script>
+
+    <!-- Added: API fetcher and box updater -->
+    <script>
+    // Fetch objects from API and populate the four corner boxes
+    (function() {
+        const API_URL = 'https://api.restful-api.dev/objects';
+        const els = {
+            status: document.getElementById('apiStatus'),
+            statusMsg: document.getElementById('apiStatusMsg'),
+            total: document.getElementById('apiTotal'),
+            totalMsg: document.getElementById('apiTotalMsg'),
+            firstId: document.getElementById('apiFirstId'),
+            firstProps: document.getElementById('apiFirstProps'),
+            lastId: document.getElementById('apiLastId'),
+            lastProps: document.getElementById('apiLastProps'),
+            refreshBtns: Array.from(document.querySelectorAll('button.refresh'))
+        };
+
+        async function fetchAndUpdate() {
+            try {
+                els.status.textContent = 'Connecting…';
+                els.statusMsg.textContent = 'Requesting ' + API_URL;
+                const res = await fetch(API_URL);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const json = await res.json();
+
+                // The API returns an object with data array or plain array; support both
+                const items = Array.isArray(json) ? json : (json.data || json.objects || json.items || []);
+                els.status.textContent = 'OK';
+                els.statusMsg.textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+
+                els.total.textContent = items.length;
+                els.totalMsg.textContent = 'Objects returned by API';
+
+                if (items.length) {
+                    const first = items[0];
+                    const last = items[items.length - 1];
+
+                    els.firstId.textContent = first.id ?? first._id ?? (first.name || '(no id)');
+                    els.firstProps.textContent = previewProps(first);
+
+                    els.lastId.textContent = last.id ?? last._id ?? (last.name || '(no id)');
+                    els.lastProps.textContent = previewProps(last);
+                } else {
+                    els.firstId.textContent = '-';
+                    els.firstProps.textContent = 'No objects';
+                    els.lastId.textContent = '-';
+                    els.lastProps.textContent = 'No objects';
+                }
+            } catch (err) {
+                els.status.textContent = 'Error';
+                els.statusMsg.textContent = String(err);
+                els.total.textContent = '-';
+                els.firstId.textContent = '-';
+                els.lastId.textContent = '-';
+                els.firstProps.textContent = '';
+                els.lastProps.textContent = '';
+                console.error('API fetch error:', err);
+            }
+        }
+
+        function previewProps(obj) {
+            if (!obj || typeof obj !== 'object') return '';
+            // pick 2 small properties for preview
+            const keys = Object.keys(obj).slice(0, 2);
+            if (!keys.length) return '(no props)';
+            return keys.map(k => `${k}: ${String(obj[k])}`).join(' · ');
+        }
+
+        // Hook up refresh buttons
+        els.refreshBtns.forEach(btn => btn.addEventListener('click', fetchAndUpdate));
+
+        // Auto-refresh once on load
+        fetchAndUpdate();
+
+        // Optional: refresh every 2 minutes
+        // setInterval(fetchAndUpdate, 2 * 60 * 1000);
+    })();
+    </script>
+
+    <!-- existing app.js (if you still have other app behavior) can be kept or removed -->
+    <script src="app.js"></script>
+</body>
+</html>
